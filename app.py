@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Depends, Request, status, Query
+from fastapi import FastAPI, HTTPException, Depends, Request, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -8,7 +8,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import os
 from dotenv import load_dotenv
-from auth import create_access_token, verify_token, verify_credentials
+from auth import verify_token
 
 load_dotenv()
 
@@ -29,17 +29,6 @@ geolocator = Nominatim(user_agent="api_procurar_localidade")
 
 
 # Models
-class LoginRequest(BaseModel):
-    username: str = Field(..., description="Nome de usuário")
-    password: str = Field(..., description="Senha")
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
-
-
 class LocalidadeResponse(BaseModel):
     endereco: str | None = None
     bairro: str | None = None
@@ -57,40 +46,7 @@ async def root():
     return {
         "message": "API de Localização por Coordenadas",
         "version": "1.0.0",
-        "endpoints": {
-            "auth": "/auth/token - POST - Gera token JWT",
-            "localidade": "/localidade?lat={lat}&lng={lng} - GET - Busca localidade (requer JWT)"
-        }
-    }
-
-
-@app.post("/auth/token", response_model=TokenResponse, tags=["Autenticação"])
-async def login(credentials: LoginRequest):
-    """
-    Gera um token JWT válido para autenticação
-
-    Credenciais padrão (configure no .env):
-    - username: admin
-    - password: admin123
-    """
-    if not verify_credentials(credentials.username, credentials.password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciais inválidas",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Cria o token
-    access_token = create_access_token(
-        data={"sub": credentials.username}
-    )
-
-    expiration_hours = int(os.getenv("JWT_EXPIRATION_HOURS", 24))
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "expires_in": expiration_hours * 3600  # em segundos
+        "endpoint": "/localidade?lat={lat}&lng={lng} - GET - Busca localidade (requer token Bearer)"
     }
 
 
@@ -100,12 +56,12 @@ async def get_localidade(
     request: Request,
     lat: float = Query(..., ge=-90, le=90, description="Latitude (-90 a 90)"),
     lng: float = Query(..., ge=-180, le=180, description="Longitude (-180 a 180)"),
-    token_data: dict = Depends(verify_token)
+    _: bool = Depends(verify_token)
 ):
     """
     Busca informações de localidade a partir de coordenadas geográficas
 
-    Requer autenticação JWT via header: Authorization: Bearer {token}
+    Requer autenticação via header: Authorization: Bearer {token}
 
     Parâmetros:
     - lat: Latitude (-90 a 90)

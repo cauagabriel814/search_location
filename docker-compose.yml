@@ -7,23 +7,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Variáveis de ambiente JWT
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
-      - JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-24}
-
-      # Credenciais de autenticação
-      - API_USERNAME=${API_USERNAME}
-      - API_PASSWORD=${API_PASSWORD}
-
-      # Rate limiting
+      - API_TOKEN=${API_TOKEN}
       - RATE_LIMIT=${RATE_LIMIT:-10/hour}
     env_file:
       - .env
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
